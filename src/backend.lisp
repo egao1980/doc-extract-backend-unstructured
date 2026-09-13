@@ -160,29 +160,34 @@
      (file-namestring (pathname source)))
     (t (format nil "upload.~a" (%format-extension format)))))
 
-(defun %as-http-request (req)
-  "Soft-use http-protocol:MAKE-HTTP-REQUEST when that system is loaded."
+(defun unstructured-request->http-request (req)
+  "Optional adapter for http-protocol:SEND.
+
+   MAKE-HTTP-FILE takes CONTENT as a required positional argument
+   (not :content). http-fn itself always receives UNSTRUCTURED-HTTP-REQUEST
+   so injected mocks stay independent of whether http-protocol is loaded."
+  (check-type req unstructured-http-request)
   (let* ((pkg (find-package :http-protocol))
          (make (and pkg (find-symbol "MAKE-HTTP-REQUEST" pkg)))
          (make-file (and pkg (find-symbol "MAKE-HTTP-FILE" pkg))))
-    (if (and make (fboundp make) make-file (fboundp make-file))
-        (funcall make
-                 :method :post
-                 :url (unstructured-http-request-url req)
-                 :form-data (append
-                             (list (cons "strategy"
-                                         (unstructured-http-request-strategy req)))
-                             (unstructured-http-request-fields req))
-                 :files (list (cons "files"
-                                    (funcall make-file
-                                             :filename
-                                             (unstructured-http-request-filename req)
-                                             :content-type
-                                             (unstructured-http-request-content-type req)
-                                             :content
-                                             (unstructured-http-request-octets req)
-                                             :field-name "files"))))
-        req)))
+    (unless (and make (fboundp make) make-file (fboundp make-file))
+      (error 'doc-extract-error
+             :message "http-protocol is not loaded — cannot build http-request"))
+    (funcall make
+             :method :post
+             :url (unstructured-http-request-url req)
+             :form-data (append
+                         (list (cons "strategy"
+                                     (unstructured-http-request-strategy req)))
+                         (unstructured-http-request-fields req))
+             :files (list (cons "files"
+                                (funcall make-file
+                                         (unstructured-http-request-octets req)
+                                         :filename
+                                         (unstructured-http-request-filename req)
+                                         :content-type
+                                         (unstructured-http-request-content-type req)
+                                         :field-name "files"))))))
 
 (defun %response-status (response)
   (cond
@@ -244,7 +249,7 @@
 
 (defun %invoke-http (backend req)
   (let ((fn (%ensure-http-fn backend)))
-    (funcall fn (%as-http-request req))))
+    (funcall fn req)))
 
 (defun %elements-from-response (backend req response)
   (let ((status (%response-status response))

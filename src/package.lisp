@@ -1,6 +1,6 @@
 (defpackage #:doc-extract-backend-unstructured
   (:use #:cl #:doc-extract-protocol)
-  (:export            #:+unstructured-partition-path+
+  (:export #:+unstructured-partition-path+
            #:+unstructured-priority+
            #:+unstructured-formats+
 
@@ -27,6 +27,7 @@
            #:unstructured-http-error-body
 
            #:partition-url
+           #:unstructured-request->http-request
            #:decode-unstructured-json
            #:element-field
            #:elements->document

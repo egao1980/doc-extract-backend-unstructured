@@ -190,6 +190,25 @@
   (ok (typep (doc-extract-protocol:find-extractor :rtf)
              'unstructured-backend)))
 
+(deftest http-fn-stays-unstructured-request-if-http-protocol-present
+  "CI loads http-protocol as a transitive OCI dep. http-fn must still see
+   unstructured-http-request (make-http-file takes positional content)."
+  (let* ((seen nil)
+         (b (make-unstructured-backend
+             :http-fn (lambda (req)
+                        (push req seen)
+                        (list 200 (fixture-json)))))
+         (doc (doc-extract-protocol:extract-document b "x" :format :txt)))
+    (ok (doc-extract-protocol:extracted-document-p doc))
+    (ok (unstructured-http-request-p (first seen)))
+    (when (find-package :http-protocol)
+      (let ((http-req (unstructured-request->http-request (first seen)))
+            (file-fn (find-symbol "HTTP-FILE-P" :http-protocol))
+            (files-fn (find-symbol "HTTP-REQUEST-FILES" :http-protocol)))
+        (ok (funcall (find-symbol "HTTP-REQUEST-P" :http-protocol) http-req))
+        (ok (and files-fn file-fn
+                 (funcall file-fn (cdr (first (funcall files-fn http-req))))))))))
+
 (deftest live-unstructured-partition
   (let ((url (uiop:getenv "DOC_EXTRACT_UNSTRUCTURED_URL")))
     (if (and url (plusp (length url)))

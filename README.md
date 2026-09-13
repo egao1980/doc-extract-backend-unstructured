@@ -25,7 +25,7 @@
 | `normalize-document` | element JSON (string / list) → `extracted-document` |
 | `make-curl-http-fn` | live canary helper (`curl` multipart POST) |
 
-`http-fn` receives an `unstructured-http-request` (`:post`, url, strategy, filename, content-type, octets). When `http-protocol` is loaded the same object is also passed as `http-protocol:http-request` with `:form-data` (`strategy`) and `:files` (`files`). Return a JSON string, octet vector, parsed element list, or `(status body)`.
+`http-fn` always receives an `unstructured-http-request` (`:post`, url, strategy, filename, content-type, octets) — including when `http-protocol` is loaded. Return a JSON string, octet vector, parsed element list, or `(status body)`. To send via `http-protocol:send`, wrap with `unstructured-request->http-request` (that helper passes file octets as `make-http-file`'s required positional `content`).
 
 Default endpoint: `http://127.0.0.1:8000`. If the endpoint already includes `/general/v0/general`, it is not appended again. `strategy` is forwarded as a multipart field (`auto`, `fast`, `hi_res`, `ocr_only`).
 
