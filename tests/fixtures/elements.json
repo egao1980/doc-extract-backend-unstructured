@@ -1,0 +1,87 @@
+[
+  {
+    "type": "Header",
+    "element_id": "hdr1",
+    "text": "CONFIDENTIAL",
+    "metadata": {
+      "filename": "sample.pdf",
+      "page_number": 1,
+      "languages": ["eng"]
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "t1",
+    "text": "Quarterly Report",
+    "metadata": {
+      "filename": "sample.pdf",
+      "page_number": 1,
+      "languages": ["eng"],
+      "coordinates": {
+        "points": [[153.0, 182.0], [467.0, 182.0], [467.0, 214.0], [153.0, 214.0]],
+        "system": "PixelSpace",
+        "layout_width": 612,
+        "layout_height": 792
+      }
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "n1",
+    "text": "Revenue grew this quarter.",
+    "metadata": {
+      "filename": "sample.pdf",
+      "page_number": 1
+    }
+  },
+  {
+    "type": "ListItem",
+    "element_id": "l1",
+    "text": "North America",
+    "metadata": {
+      "page_number": 1
+    }
+  },
+  {
+    "type": "ListItem",
+    "element_id": "l2",
+    "text": "EMEA",
+    "metadata": {
+      "page_number": 1
+    }
+  },
+  {
+    "type": "Table",
+    "element_id": "tb1",
+    "text": "Region Sales\nNA 10",
+    "metadata": {
+      "page_number": 2,
+      "text_as_html": "<table><tr><th>Region</th><th>Sales</th></tr><tr><td>NA</td><td>10</td></tr></table>"
+    }
+  },
+  {
+    "type": "Title",
+    "element_id": "t2",
+    "text": "Outlook",
+    "metadata": {
+      "filename": "sample.pdf",
+      "page_number": 2
+    }
+  },
+  {
+    "type": "NarrativeText",
+    "element_id": "n2",
+    "text": "We remain cautious.",
+    "metadata": {
+      "page_number": 2
+    }
+  },
+  {
+    "type": "Image",
+    "element_id": "i1",
+    "text": "Chart of sales",
+    "metadata": {
+      "page_number": 2
+    }
+  }
+]
