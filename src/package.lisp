@@ -32,6 +32,6 @@
            #:element-field
            #:elements->document
            #:elements->sections
-           #:make-curl-http-fn))
+           #:make-http-protocol-http-fn))
 
 (in-package #:doc-extract-backend-unstructured)

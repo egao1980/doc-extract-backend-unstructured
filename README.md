@@ -23,9 +23,9 @@
 | `extract-document` | primary GF → `extracted-document` |
 | `extract-sections` / `extract-text` / `extract-metadata` | protocol GFs |
 | `normalize-document` | element JSON (string / list) → `extracted-document` |
-| `make-curl-http-fn` | live canary helper (`curl` multipart POST) |
+| `make-http-protocol-http-fn` | `&key backend client` — POST through `http-protocol:send` (default `*http-backend*`, e.g. http-backend-async × event-backend-libuv); no curl |
 
-`http-fn` always receives an `unstructured-http-request` (`:post`, url, strategy, filename, content-type, octets) — including when `http-protocol` is loaded. Return a JSON string, octet vector, parsed element list, or `(status body)`. To send via `http-protocol:send`, wrap with `unstructured-request->http-request` (that helper passes file octets as `make-http-file`'s required positional `content`).
+`http-fn` always receives an `unstructured-http-request` (`:post`, url, strategy, filename, content-type, octets) — including when `http-protocol` is loaded. Return a JSON string, octet vector, parsed element list, or `(status body)`. `make-http-protocol-http-fn` sends it with `http-protocol:send` via `unstructured-request->http-request`, which builds the multipart body through http-protocol (RFC 7578 quoting), so a file name or strategy value is always plain data: it cannot add parts or headers, or make the client read a local file. Response bodies are decoded as UTF-8.
 
 Default endpoint: `http://127.0.0.1:8000`. If the endpoint already includes `/general/v0/general`, it is not appended again. `strategy` is forwarded as a multipart field (`auto`, `fast`, `hi_res`, `ocr_only`).
 
