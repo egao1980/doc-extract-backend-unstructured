@@ -4,6 +4,9 @@
   :author "egao1980"
   :license "MIT"
   :depends-on ("doc-extract-protocol" (:version "http-protocol" "0.4.1") "encoding-protocol")
+  ;; mime-protocol is a dependency of http-protocol 0.4.1; the CI client image
+  ;; still walks its loaded 0.4.0 and misses it (egao1980/cl-repository#129).
+  :properties (:cl-repo (:ci (:with ("mime-protocol"))))
   :serial t
   :pathname "src"
   :components ((:file "package")
