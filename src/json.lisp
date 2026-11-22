@@ -140,7 +140,8 @@
                   :message (format nil "invalid JSON at ~d" i)))))))
 
 (defun %octets-to-string (octets)
-  (map 'string #'code-char octets))
+  "Response octets are UTF-8 (RFC 8259 section 8.1)."
+  (encoding-protocol:decode (coerce octets '(vector (unsigned-byte 8))) :encoding :utf-8))
 
 (defun %try-json-protocol (string)
   (let* ((pkg (find-package :json-protocol))

@@ -161,70 +161,55 @@
     (t (format nil "upload.~a" (%format-extension format)))))
 
 (defun unstructured-request->http-request (req)
-  "Optional adapter for http-protocol:SEND.
+  "REQ → an http-protocol:HTTP-REQUEST: a multipart/form-data POST with the
+   strategy (and any extra FIELDS) as form fields and the document as the
+   `files` part. http-protocol quotes every name and filename (RFC 7578), so
+   neither the file name nor the strategy can add parts, headers, or read a
+   local file.
 
-   MAKE-HTTP-FILE takes CONTENT as a required positional argument
-   (not :content). http-fn itself always receives UNSTRUCTURED-HTTP-REQUEST
-   so injected mocks stay independent of whether http-protocol is loaded."
+   http-fn itself always receives UNSTRUCTURED-HTTP-REQUEST, so injected
+   mocks see the plain request."
   (check-type req unstructured-http-request)
-  (let* ((pkg (find-package :http-protocol))
-         (make (and pkg (find-symbol "MAKE-HTTP-REQUEST" pkg)))
-         (make-file (and pkg (find-symbol "MAKE-HTTP-FILE" pkg))))
-    (unless (and make (fboundp make) make-file (fboundp make-file))
-      (error 'doc-extract-error
-             :message "http-protocol is not loaded — cannot build http-request"))
-    (funcall make
-             :method :post
-             :url (unstructured-http-request-url req)
-             :form-data (append
-                         (list (cons "strategy"
-                                     (unstructured-http-request-strategy req)))
-                         (unstructured-http-request-fields req))
-             :files (list (cons "files"
-                                (funcall make-file
-                                         (unstructured-http-request-octets req)
-                                         :filename
-                                         (unstructured-http-request-filename req)
-                                         :content-type
-                                         (unstructured-http-request-content-type req)
-                                         :field-name "files"))))))
+  (http-protocol:make-http-request
+   :method :post
+   :url (unstructured-http-request-url req)
+   :form-data (append
+               (list (cons "strategy" (unstructured-http-request-strategy req)))
+               (unstructured-http-request-fields req))
+   :files (list (cons "files"
+                      (http-protocol:make-http-file
+                       (unstructured-http-request-octets req)
+                       :filename (unstructured-http-request-filename req)
+                       :content-type (unstructured-http-request-content-type req)
+                       :content-length (length (unstructured-http-request-octets req))
+                       :field-name "files")))))
 
 (defun %response-status (response)
   (cond
     ((integerp response) response)
     ((and (consp response) (integerp (car response))) (car response))
-    ((or (stringp response) (hash-table-p response) (listp response)
-         (and (vectorp response) (not (stringp response))))
-     200)
-    (t
-     (let* ((pkg (find-package :http-protocol))
-            (st (and pkg (find-symbol "RESPONSE-STATUS" pkg))))
-       (if (and st (fboundp st))
-           (or (funcall st response) 200)
-           200)))))
+    ((typep response 'http-protocol:http-response)
+     (or (http-protocol:response-status response) 200))
+    (t 200)))
 
 (defun %response-body (response)
   (cond
-    ((stringp response) response)
-    ((and (vectorp response) (not (stringp response))) response)
     ((and (consp response) (integerp (car response)))
      (cadr response))
-    ((or (hash-table-p response) (listp response))
-     response)
-    (t
-     (let* ((pkg (find-package :http-protocol))
-            (body (and pkg (find-symbol "RESPONSE-BODY" pkg))))
-       (if (and body (fboundp body))
-           (funcall body response)
-           response)))))
+    ((typep response 'http-protocol:http-response)
+     (http-protocol:response-body response))
+    (t response)))
 
 (defun %body-string (body)
+  "Response BODY as text: octets and streams are decoded as UTF-8."
   (cond
     ((stringp body) body)
+    ((streamp body) (%body-string (http-protocol:slurp-octets body)))
     ((and (vectorp body) (not (stringp body))
           (plusp (length body))
           (typep (aref body 0) '(unsigned-byte 8)))
-     (map 'string #'code-char body))
+     (encoding-protocol:decode (coerce body '(vector (unsigned-byte 8)))
+                               :encoding :utf-8))
     (t body)))
 
 (defun build-partition-request (backend source &key format)
@@ -242,7 +227,7 @@
   (or (unstructured-backend-http-fn backend)
       (restart-case
           (error 'doc-extract-error
-                 :message "unstructured-backend has no http-fn — inject one or use make-curl-http-fn")
+                 :message "unstructured-backend has no http-fn — inject one or use make-http-protocol-http-fn")
         (retry ()
           :report "Retry after installing http-fn"
           (%ensure-http-fn backend)))))
@@ -286,41 +271,26 @@
              :report "Retry partition"
              (go :again)))))))
 
-(defun make-curl-http-fn ()
-  "http-fn that POSTs multipart via curl(1). Used by the live canary."
+(defun make-http-protocol-http-fn (&key backend client)
+  "http-fn that POSTs the partition request through http-protocol:SEND.
+
+   BACKEND defaults to http-protocol:*HTTP-BACKEND* at call time (load
+   http-backend-async with event-backend-libuv for the stack client); CLIENT
+   to *HTTP-CLIENT* or a fresh client for BACKEND. Returns (status body)
+   with the body as octets."
   (lambda (req)
-    (let* ((url (if (unstructured-http-request-p req)
-                    (unstructured-http-request-url req)
-                    (let* ((pkg (find-package :http-protocol))
-                           (u (and pkg (find-symbol "HTTP-REQUEST-URL" pkg))))
-                      (if (and u (fboundp u))
-                          (funcall u req)
-                          (error 'doc-extract-error
-                                 :message "curl http-fn: unknown request type")))))
-           (strategy (if (unstructured-http-request-p req)
-                         (unstructured-http-request-strategy req)
-                         "auto"))
-           (filename (if (unstructured-http-request-p req)
-                         (unstructured-http-request-filename req)
-                         "upload.bin"))
-           (ct (if (unstructured-http-request-p req)
-                   (unstructured-http-request-content-type req)
-                   "application/octet-stream"))
-           (octets (if (unstructured-http-request-p req)
-                       (unstructured-http-request-octets req)
-                       #())))
-      (uiop:with-temporary-file (:pathname path :stream out
-                                 :element-type '(unsigned-byte 8)
-                                 :direction :output)
-        (write-sequence octets out)
-        (finish-output out)
-        (uiop:run-program
-         (list "curl" "-sS" "-X" "POST" url
-               "-F" (format nil "files=@~a;filename=~a;type=~a"
-                            (namestring path) filename ct)
-               "-F" (format nil "strategy=~a" strategy))
-         :output :string
-         :error-output :string)))))
+    (let* ((backend (or backend
+                        http-protocol:*http-backend*
+                        (error 'doc-extract-error
+                               :message "http-protocol:*http-backend* is nil — load an http backend (e.g. http-backend-async)")))
+           (client (or client
+                       http-protocol:*http-client*
+                       (http-protocol:make-http-client backend)))
+           (response (http-protocol:send backend client
+                                         (unstructured-request->http-request req)))
+           (body (http-protocol:response-body response)))
+      (list (or (http-protocol:response-status response) 200)
+            (if (streamp body) (http-protocol:slurp-octets body) body)))))
 
 (defmethod extract-metadata :around ((backend unstructured-backend) source
                                      &key format)

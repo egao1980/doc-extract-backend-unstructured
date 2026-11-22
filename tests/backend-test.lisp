@@ -211,13 +211,13 @@
 
 (deftest live-unstructured-partition
   (let ((url (uiop:getenv "DOC_EXTRACT_UNSTRUCTURED_URL")))
-    (if (and url (plusp (length url)))
+    (if (and url (plusp (length url)) http-protocol:*http-backend*)
         (let* ((b (make-unstructured-backend
                    :endpoint url
                    :strategy "fast"
-                   :http-fn (make-curl-http-fn)))
+                   :http-fn (make-http-protocol-http-fn)))
                (doc (doc-extract-protocol:extract-document
                      b "Hello unstructured." :format :txt)))
           (ok (doc-extract-protocol:extracted-document-p doc))
           (ok (plusp (length (doc-extract-protocol:document-text doc)))))
-        (skip "DOC_EXTRACT_UNSTRUCTURED_URL not set"))))
+        (skip "DOC_EXTRACT_UNSTRUCTURED_URL or http-protocol:*http-backend* not set"))))
